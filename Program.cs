@@ -12,6 +12,8 @@ using ShipmentService.Infrastructure.Workers;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<ShipmentDbContext>(options =>
 {
@@ -57,6 +59,12 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.MapHealthChecks("/health");
 app.MapShipmentEndpoints();
