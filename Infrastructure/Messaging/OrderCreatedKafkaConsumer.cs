@@ -81,6 +81,8 @@ public sealed class OrderCreatedKafkaConsumer : BackgroundService
             envelope.CorrelationId);
 
         var payload = envelope.Payload;
+        ValidatePayload(payload, envelope.EventId);
+
         var command = new CreateShipmentCommand(
             envelope.EventId,
             payload.OrderId,
@@ -99,5 +101,59 @@ public sealed class OrderCreatedKafkaConsumer : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var handler = scope.ServiceProvider.GetRequiredService<ShipmentCreationHandler>();
         await handler.HandleAsync(command, envelope.CorrelationId, cancellationToken);
+    }
+
+    private void ValidatePayload(OrderCreatedIntegrationEvent payload, Guid eventId)
+    {
+        var missingFields = new List<string>();
+
+        if (payload.OrderId == Guid.Empty) missingFields.Add(nameof(payload.OrderId));
+        if (payload.BuyerId == Guid.Empty) missingFields.Add(nameof(payload.BuyerId));
+        if (payload.SellerId == Guid.Empty) missingFields.Add(nameof(payload.SellerId));
+        if (string.IsNullOrWhiteSpace(payload.ShippingPromiseId)) missingFields.Add(nameof(payload.ShippingPromiseId));
+        if (string.IsNullOrWhiteSpace(payload.RouteId)) missingFields.Add(nameof(payload.RouteId));
+        if (string.IsNullOrWhiteSpace(payload.CarrierCode)) missingFields.Add(nameof(payload.CarrierCode));
+        if (string.IsNullOrWhiteSpace(payload.ServiceLevelCode)) missingFields.Add(nameof(payload.ServiceLevelCode));
+        if (payload.OriginNodeId == Guid.Empty) missingFields.Add(nameof(payload.OriginNodeId));
+        if (payload.PromisedDeliveryDate == default) missingFields.Add(nameof(payload.PromisedDeliveryDate));
+        if (payload.Destination is null)
+        {
+            missingFields.Add(nameof(payload.Destination));
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(payload.Destination.Street)) missingFields.Add("Destination.Street");
+            if (string.IsNullOrWhiteSpace(payload.Destination.Number)) missingFields.Add("Destination.Number");
+            if (string.IsNullOrWhiteSpace(payload.Destination.City)) missingFields.Add("Destination.City");
+            if (string.IsNullOrWhiteSpace(payload.Destination.State)) missingFields.Add("Destination.State");
+            if (string.IsNullOrWhiteSpace(payload.Destination.PostalCode)) missingFields.Add("Destination.ZipCode");
+            if (string.IsNullOrWhiteSpace(payload.Destination.Country)) missingFields.Add("Destination.Country");
+        }
+
+        if (payload.Packages is null || payload.Packages.Count == 0)
+        {
+            missingFields.Add(nameof(payload.Packages));
+        }
+        else
+        {
+            for (var index = 0; index < payload.Packages.Count; index++)
+            {
+                var package = payload.Packages[index];
+                if (package.WeightKg <= 0) missingFields.Add($"Packages[{index}].WeightKg");
+                if (package.HeightCm <= 0) missingFields.Add($"Packages[{index}].HeightCm");
+                if (package.WidthCm <= 0) missingFields.Add($"Packages[{index}].WidthCm");
+                if (package.LengthCm <= 0) missingFields.Add($"Packages[{index}].LengthCm");
+                if (package.Items is null || package.Items.Count == 0) missingFields.Add($"Packages[{index}].Items");
+            }
+        }
+
+        if (missingFields.Count == 0) return;
+
+        _logger.LogError(
+            "Cannot create shipment from order.created event {EventId}; missing or invalid required fields: {MissingFields}",
+            eventId,
+            string.Join(", ", missingFields));
+
+        throw new InvalidOperationException($"order.created event {eventId} is missing required fields: {string.Join(", ", missingFields)}");
     }
 }

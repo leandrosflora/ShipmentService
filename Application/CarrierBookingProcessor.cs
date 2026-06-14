@@ -46,17 +46,24 @@ public sealed class CarrierBookingProcessor
             await _outbox.AddAsync(
                 topic: "shipment.events",
                 aggregateKey: shipment.OrderId.ToString(),
-                message: new ShipmentCreatedIntegrationEvent(
+                message: new EventEnvelope<ShipmentCreatedIntegrationEvent>(
                     Guid.NewGuid(),
+                    "shipment.created",
+                    "1.0",
+                    DateTimeOffset.UtcNow,
+                    shipment.OrderId.ToString(),
+                    "shipment-service",
+                    new ShipmentCreatedIntegrationEvent(
                     shipment.Id,
                     shipment.OrderId,
+                    shipment.BuyerId,
                     shipment.CarrierCode,
                     shipment.ServiceLevelCode,
                     carrierResponse.ExternalShipmentId,
                     carrierResponse.TrackingCode,
                     storedLabel.ObjectKey,
                     shipment.PromisedDeliveryDate,
-                    DateTimeOffset.UtcNow),
+                    DateTimeOffset.UtcNow)),
                 cancellationToken);
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -105,7 +112,7 @@ public sealed class CarrierBookingProcessor
             shipment.ServiceLevelCode,
             shipment.RouteId,
             shipment.OriginNodeId,
-            new ShipmentAddressDto(destination.RecipientName, destination.Street, destination.Number, destination.Complement, destination.District, destination.City, destination.State, destination.PostalCode, destination.Country, destination.Phone),
+            new ShipmentAddressDto(destination.Street, destination.Number, destination.City, destination.State, destination.PostalCode, destination.Country, destination.RecipientName, destination.Complement, destination.District, destination.Phone),
             shipment.Packages.Select(package => new CarrierPackageDto(
                 package.Sequence,
                 package.WeightKg,
