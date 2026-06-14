@@ -40,7 +40,7 @@ CREATE TABLE shipments (
 CREATE INDEX idx_shipments_pending
 ON shipments (status, next_attempt_at, processing_lease_until);
 
-CREATE INDEX idx_shipments_order
+CREATE UNIQUE INDEX idx_shipments_order
 ON shipments (order_id);
 
 CREATE TABLE shipment_packages (

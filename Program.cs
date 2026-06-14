@@ -5,6 +5,7 @@ using ShipmentService.Application;
 using ShipmentService.Application.Ports;
 using ShipmentService.Infrastructure.Carrier;
 using ShipmentService.Infrastructure.FeatureFlags;
+using ShipmentService.Infrastructure.Messaging;
 using ShipmentService.Infrastructure.Outbox;
 using ShipmentService.Infrastructure.Persistence;
 using ShipmentService.Infrastructure.Storage;
@@ -17,6 +18,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<ShipmentFeatureFlags>(builder.Configuration.GetSection("FeatureFlags"));
+builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection("Kafka"));
 var featureFlags = builder.Configuration.GetSection("FeatureFlags").Get<ShipmentFeatureFlags>() ?? new ShipmentFeatureFlags();
 
 builder.Services.AddDbContext<ShipmentDbContext>(options =>
@@ -37,7 +39,7 @@ else
     builder.Services.AddScoped<IShipmentRepository, ShipmentRepository>();
 }
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
-builder.Services.AddSingleton<IMessagePublisher, LoggingMessagePublisher>();
+builder.Services.AddSingleton<IMessagePublisher, KafkaMessagePublisher>();
 
 builder.Services.AddSingleton<ILabelStorage, FileSystemLabelStorage>();
 
@@ -63,6 +65,7 @@ builder.Services
 
 builder.Services.AddHostedService<CarrierBookingWorker>();
 builder.Services.AddHostedService<OutboxDispatcher>();
+builder.Services.AddHostedService<OrderCreatedKafkaConsumer>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ShipmentDbContext>();

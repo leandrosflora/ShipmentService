@@ -46,6 +46,7 @@ public sealed class ShipmentDbContext : DbContext
             entity.Property(x => x.CancelledAt).HasColumnName("cancelled_at");
 
             entity.HasIndex(x => x.ShipmentRequestId).IsUnique();
+            entity.HasIndex(x => x.OrderId).IsUnique();
             entity.HasIndex(x => new { x.OrderId, x.Status });
             entity.HasIndex(x => new { x.Status, x.NextAttemptAt, x.ProcessingLeaseUntil });
             entity.HasIndex(x => x.ExternalShipmentId).IsUnique();
