@@ -685,3 +685,102 @@ Sugestões de cobertura futura:
 - Adicionar métricas de workers, Outbox, retries e latência do Carrier Service.
 - Criar testes automatizados unitários, integração e contratos.
 - Documentar adapters responsáveis por consumir mensagens e acionar `ShipmentCreationHandler`.
+
+## Kafka local end-to-end
+
+Este serviço possui integração Kafka real com `Confluent.Kafka` para o fluxo canônico do Shipment Service:
+
+- consome `order.created`;
+- cria a remessa de forma idempotente usando Inbox e chave de negócio do pedido;
+- grava `shipment.created` na Outbox dentro da mesma transação;
+- publica `shipment.created` pelo dispatcher da Outbox.
+
+A configuração padrão para execução local fora do Docker é:
+
+```json
+{
+  "Kafka": {
+    "BootstrapServers": "localhost:9092",
+    "ConsumerGroupId": "shipment-service",
+    "Topics": {
+      "OrderCreated": "order.created",
+      "ShipmentCreated": "shipment.created"
+    }
+  }
+}
+```
+
+O broker Kafka local deve ser `localhost:9092`. O Kafka UI da solução de arquitetura fica em `http://localhost:8088`, mas ele não deve ser usado como broker pelos microservices.
+
+### Executar localmente
+
+1. Suba a infraestrutura local pelo repositório de arquitetura `meli-envios-architecture`.
+2. Aplique/crie o banco do Shipment Service usando `Infrastructure/Persistence/schema.sql`.
+3. Restaure, compile e execute o serviço:
+
+```bash
+dotnet restore
+dotnet build
+dotnet run
+```
+
+### Publicar um evento `order.created` para teste
+
+Use o Kafka UI ou a CLI do Kafka para enviar uma mensagem JSON no tópico `order.created`. O payload deve usar o envelope canônico:
+
+```json
+{
+  "eventId": "00000000-0000-0000-0000-000000000201",
+  "eventType": "order.created",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-06-14T00:00:00Z",
+  "correlationId": "local-e2e-001",
+  "producer": "order-service",
+  "payload": {
+    "orderId": "00000000-0000-0000-0000-000000000010",
+    "buyerId": "00000000-0000-0000-0000-000000000020",
+    "sellerId": "00000000-0000-0000-0000-000000000030",
+    "shippingPromiseId": "promise-123",
+    "routeId": "route-sp-rj-01",
+    "carrierCode": "CORREIOS",
+    "serviceLevelCode": "SEDEX",
+    "originNodeId": "00000000-0000-0000-0000-000000000040",
+    "promisedDeliveryDate": "2026-06-20",
+    "destination": {
+      "recipientName": "Maria Silva",
+      "street": "Rua Exemplo",
+      "number": "100",
+      "complement": "Apto 10",
+      "district": "Centro",
+      "city": "São Paulo",
+      "state": "SP",
+      "postalCode": "01001000",
+      "country": "BRA",
+      "phone": "+5511999999999"
+    },
+    "packages": [
+      {
+        "sequence": 1,
+        "weightKg": 1.2,
+        "heightCm": 10,
+        "widthCm": 20,
+        "lengthCm": 30,
+        "items": [
+          {
+            "skuId": "00000000-0000-0000-0000-000000000100",
+            "quantity": 2
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Validar no Kafka UI
+
+1. Abra `http://localhost:8088`.
+2. Verifique se a mensagem foi consumida no tópico `order.created` pelo consumer group `shipment-service`.
+3. Consulte o tópico `shipment.created`.
+4. A mensagem publicada deve ter key igual ao `orderId` e envelope com `eventType = "shipment.created"` e o mesmo `correlationId` recebido no `order.created`.
+5. Os logs do serviço também informam `topic`, `message key`, `eventType` e `correlationId` para consumo e publicação.
