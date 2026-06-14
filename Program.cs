@@ -4,6 +4,7 @@ using ShipmentService.Api;
 using ShipmentService.Application;
 using ShipmentService.Application.Ports;
 using ShipmentService.Infrastructure.Carrier;
+using ShipmentService.Infrastructure.FeatureFlags;
 using ShipmentService.Infrastructure.Outbox;
 using ShipmentService.Infrastructure.Persistence;
 using ShipmentService.Infrastructure.Storage;
@@ -15,6 +16,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.Configure<ShipmentFeatureFlags>(builder.Configuration.GetSection("FeatureFlags"));
+var featureFlags = builder.Configuration.GetSection("FeatureFlags").Get<ShipmentFeatureFlags>() ?? new ShipmentFeatureFlags();
+
 builder.Services.AddDbContext<ShipmentDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("ShipmentDb"));
@@ -24,7 +28,14 @@ builder.Services.AddScoped<ShipmentCreationHandler>();
 builder.Services.AddScoped<CarrierBookingProcessor>();
 builder.Services.AddScoped<ShipmentCancellationService>();
 
-builder.Services.AddScoped<IShipmentRepository, ShipmentRepository>();
+if (featureFlags.UseMockShipmentRepository)
+{
+    builder.Services.AddScoped<IShipmentRepository, MockShipmentRepository>();
+}
+else
+{
+    builder.Services.AddScoped<IShipmentRepository, ShipmentRepository>();
+}
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddSingleton<IMessagePublisher, LoggingMessagePublisher>();
 
