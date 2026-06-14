@@ -36,19 +36,19 @@ public sealed class ShipmentCreationHandler
         if (existingShipment is null)
         {
             var address = new ShipmentAddress(
-                command.Destination.RecipientName,
+                string.IsNullOrWhiteSpace(command.Destination.RecipientName) ? command.BuyerId.ToString() : command.Destination.RecipientName,
                 command.Destination.Street,
                 command.Destination.Number,
                 command.Destination.Complement,
-                command.Destination.District,
+                command.Destination.District ?? string.Empty,
                 command.Destination.City,
                 command.Destination.State,
                 command.Destination.PostalCode,
                 command.Destination.Country,
                 command.Destination.Phone);
 
-            var packages = command.Packages.Select(package => new ShipmentPackage(
-                package.Sequence,
+            var packages = command.Packages.Select((package, index) => new ShipmentPackage(
+                package.Sequence > 0 ? package.Sequence : index + 1,
                 package.WeightKg,
                 package.HeightCm,
                 package.WidthCm,
@@ -79,14 +79,14 @@ public sealed class ShipmentCreationHandler
                 correlationId,
                 "shipment-service",
                 new ShipmentCreatedIntegrationEvent(
-                    Guid.NewGuid(),
                     shipment.Id,
                     shipment.OrderId,
+                    shipment.BuyerId,
                     shipment.CarrierCode,
                     shipment.ServiceLevelCode,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
+                    $"ext-{shipment.Id:N}",
+                    $"TRACK-{shipment.Id:N}",
+                    $"labels/{shipment.Id:N}.pdf",
                     shipment.PromisedDeliveryDate,
                     DateTimeOffset.UtcNow));
 

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ShipmentService.Contracts;
 
 public sealed record CreateShipmentCommand(
@@ -16,23 +18,24 @@ public sealed record CreateShipmentCommand(
     IReadOnlyList<CreateShipmentPackageDto> Packages);
 
 public sealed record ShipmentAddressDto(
-    string RecipientName,
     string Street,
     string Number,
-    string? Complement,
-    string District,
     string City,
     string State,
-    string PostalCode,
+    [property: JsonPropertyName("zipCode")] string PostalCode,
     string Country,
-    string? Phone);
+    string? RecipientName = null,
+    string? Complement = null,
+    string? District = null,
+    string? Phone = null);
 
 public sealed record CreateShipmentPackageDto(
-    int Sequence,
     decimal WeightKg,
     decimal HeightCm,
     decimal WidthCm,
     decimal LengthCm,
-    IReadOnlyList<CreateShipmentPackageItemDto> Items);
+    IReadOnlyList<CreateShipmentPackageItemDto> Items,
+    string? PackageId = null,
+    int Sequence = 0);
 
 public sealed record CreateShipmentPackageItemDto(Guid SkuId, int Quantity);

@@ -2,6 +2,7 @@ namespace ShipmentService.Contracts;
 
 public sealed record OrderCreatedIntegrationEvent(
     Guid OrderId,
+    Guid CheckoutId,
     Guid BuyerId,
     Guid SellerId,
     string ShippingPromiseId,
@@ -11,4 +12,7 @@ public sealed record OrderCreatedIntegrationEvent(
     Guid OriginNodeId,
     DateOnly PromisedDeliveryDate,
     ShipmentAddressDto Destination,
-    IReadOnlyList<CreateShipmentPackageDto> Packages);
+    IReadOnlyList<CreateShipmentPackageDto> Packages,
+    decimal TotalAmount,
+    string Currency,
+    DateTimeOffset CreatedAt);

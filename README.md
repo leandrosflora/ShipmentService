@@ -353,22 +353,75 @@ Enviada via HTTP para `POST /carrier-shipments` no serviço externo configurado 
 
 ### Eventos de integração publicados
 
-#### `ShipmentCreatedIntegrationEvent`
+#### Entrada Kafka: `order.created`
 
-Publicado no tópico `shipment.events` quando o booking é concluído com sucesso.
+O consumer `OrderCreatedKafkaConsumer` consome o tópico `order.created` usando o envelope padrão (`eventId`, `eventType`, `schemaVersion`, `occurredAt`, `correlationId`, `producer`, `payload`). O `eventType` deve ser exatamente `order.created`; o `eventId` é usado como chave de idempotência da Inbox e o `correlationId` é propagado para os eventos publicados. Campos extras são tolerados para compatibilidade evolutiva, mas campos obrigatórios ausentes fazem o processamento falhar com log explícito.
 
-Inclui:
+Payload canônico esperado:
 
-- `MessageId`
-- `ShipmentId`
-- `OrderId`
-- `CarrierCode`
-- `ServiceLevelCode`
-- `ExternalShipmentId`
-- `TrackingCode`
-- `LabelObjectKey`
-- `PromisedDeliveryDate`
-- `OccurredAt`
+```json
+{
+  "orderId": "00000000-0000-0000-0000-000000000010",
+  "checkoutId": "00000000-0000-0000-0000-000000000011",
+  "buyerId": "00000000-0000-0000-0000-000000000020",
+  "sellerId": "00000000-0000-0000-0000-000000000030",
+  "shippingPromiseId": "promise_123",
+  "routeId": "route_123",
+  "carrierCode": "carrier_1",
+  "serviceLevelCode": "same_day",
+  "originNodeId": "00000000-0000-0000-0000-000000000040",
+  "promisedDeliveryDate": "2026-06-15",
+  "destination": {
+    "street": "Av. Paulista",
+    "number": "1000",
+    "city": "São Paulo",
+    "state": "SP",
+    "zipCode": "01310-100",
+    "country": "BR"
+  },
+  "packages": [
+    {
+      "packageId": "pkg_123",
+      "weightKg": 1.2,
+      "heightCm": 10,
+      "widthCm": 20,
+      "lengthCm": 30,
+      "items": [
+        {
+          "skuId": "00000000-0000-0000-0000-000000000100",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "totalAmount": 129.9,
+  "currency": "BRL",
+  "createdAt": "2026-06-14T12:00:00Z"
+}
+```
+
+#### Saída Kafka: `shipment.created`
+
+Publicado no tópico `shipment.created` com o envelope padrão. O payload propaga `buyerId` junto com `orderId` para que `TrackingService` e `NotificationService` consigam consumir o evento sem lookup obrigatório adicional; em especial, a notificação depende do `buyerId` para endereçar o comprador.
+
+Payload canônico publicado:
+
+```json
+{
+  "shipmentId": "00000000-0000-0000-0000-000000000050",
+  "orderId": "00000000-0000-0000-0000-000000000010",
+  "buyerId": "00000000-0000-0000-0000-000000000020",
+  "carrierCode": "carrier_1",
+  "serviceLevelCode": "same_day",
+  "externalShipmentId": "ext_123",
+  "trackingCode": "BR123456789",
+  "labelObjectKey": "labels/shp_123.pdf",
+  "estimatedDeliveryDate": "2026-06-15",
+  "createdAt": "2026-06-14T12:00:00Z"
+}
+```
+
+Em E2E local/mock, quando o booking externo ainda não fornece rastreio, o serviço publica um código determinístico no formato `TRACK-{shipmentId:N}` para evitar `trackingCode` vazio.
 
 #### `ShipmentCreationFailedIntegrationEvent`
 
@@ -733,34 +786,31 @@ Use o Kafka UI ou a CLI do Kafka para enviar uma mensagem JSON no tópico `order
   "eventId": "00000000-0000-0000-0000-000000000201",
   "eventType": "order.created",
   "schemaVersion": "1.0",
-  "occurredAt": "2026-06-14T00:00:00Z",
+  "occurredAt": "2026-06-14T12:00:00Z",
   "correlationId": "local-e2e-001",
   "producer": "order-service",
   "payload": {
     "orderId": "00000000-0000-0000-0000-000000000010",
+    "checkoutId": "00000000-0000-0000-0000-000000000011",
     "buyerId": "00000000-0000-0000-0000-000000000020",
     "sellerId": "00000000-0000-0000-0000-000000000030",
-    "shippingPromiseId": "promise-123",
-    "routeId": "route-sp-rj-01",
-    "carrierCode": "CORREIOS",
-    "serviceLevelCode": "SEDEX",
+    "shippingPromiseId": "promise_123",
+    "routeId": "route_123",
+    "carrierCode": "carrier_1",
+    "serviceLevelCode": "same_day",
     "originNodeId": "00000000-0000-0000-0000-000000000040",
-    "promisedDeliveryDate": "2026-06-20",
+    "promisedDeliveryDate": "2026-06-15",
     "destination": {
-      "recipientName": "Maria Silva",
-      "street": "Rua Exemplo",
-      "number": "100",
-      "complement": "Apto 10",
-      "district": "Centro",
+      "street": "Av. Paulista",
+      "number": "1000",
       "city": "São Paulo",
       "state": "SP",
-      "postalCode": "01001000",
-      "country": "BRA",
-      "phone": "+5511999999999"
+      "zipCode": "01310-100",
+      "country": "BR"
     },
     "packages": [
       {
-        "sequence": 1,
+        "packageId": "pkg_123",
         "weightKg": 1.2,
         "heightCm": 10,
         "widthCm": 20,
@@ -768,11 +818,14 @@ Use o Kafka UI ou a CLI do Kafka para enviar uma mensagem JSON no tópico `order
         "items": [
           {
             "skuId": "00000000-0000-0000-0000-000000000100",
-            "quantity": 2
+            "quantity": 1
           }
         ]
       }
-    ]
+    ],
+    "totalAmount": 129.9,
+    "currency": "BRL",
+    "createdAt": "2026-06-14T12:00:00Z"
   }
 }
 ```
