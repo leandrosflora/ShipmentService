@@ -11,4 +11,5 @@ public sealed class KafkaTopicsOptions
 {
     public string OrderCreated { get; init; } = "order.created";
     public string ShipmentCreated { get; init; } = "shipment.created";
+    public string ShipmentCommands { get; init; } = "shipment.commands";
 }

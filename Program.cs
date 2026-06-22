@@ -84,6 +84,7 @@ builder.Services
 builder.Services.AddHostedService<CarrierBookingWorker>();
 builder.Services.AddHostedService<OutboxDispatcher>();
 builder.Services.AddHostedService<OrderCreatedKafkaConsumer>();
+builder.Services.AddHostedService<ShipmentCommandsConsumer>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ShipmentDbContext>();
